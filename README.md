@@ -6,6 +6,13 @@ A streamlined macOS utility designed for professional directory customization. B
 
 <img width="602" height="434" alt="Screenshot 2026-01-04 at 9 35 59 AM" src="https://github.com/user-attachments/assets/ee36c967-a618-4e17-aaec-afb9300adcaf" />
 
+### Demo
+
+
+https://github.com/user-attachments/assets/a5ca16bb-508a-4b9c-9a4f-a935f735547c
+
+
+
 ## Workflow
 
 The application operates on a simple three-step pipeline:

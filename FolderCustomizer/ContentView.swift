@@ -4,121 +4,199 @@ import AppKit
 struct ContentView: View {
     @State private var folderURL: URL?
     @State private var iconImage: NSImage?
-    @State private var folderContents: [String] = []
-    @State private var statusMessage: String = "Select a folder to begin"
+    @State private var statusMessage: String = "Ready to customize"
+    @State private var isHoveringFolder = false
+    @State private var isHoveringImage = false
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Folder Icon Customizer")
-                .font(.title)
-                .padding(.top)
+        ZStack {
+            // macOS Native Background Blur
+            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                .ignoresSafeArea()
 
-            // 1. Folder Selection and Preview
-            VStack {
-                Button("Select Folder from Desktop") {
-                    selectFolder()
+            VStack(spacing: 30) {
+                // Header
+                VStack(spacing: 8) {
+                    Text("Iconic")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                    Text("Professional folder customization")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
-                
-                if let folder = folderURL {
-                    Text("Selected: \(folder.lastPathComponent)")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    
-                    // Folder Preview List
-                    List(folderContents, id: \.self) { fileName in
-                        Label(fileName, systemImage: "doc")
+                .padding(.top, 30)
+
+                // Selection Area
+                HStack(spacing: 20) {
+                    // Folder Slot
+                    SelectionCard(
+                        title: folderURL?.lastPathComponent ?? "Select Folder",
+                        subtitle: "Target",
+                        icon: "folder.fill",
+                        image: nil,
+                        isSelected: folderURL != nil,
+                        isHovering: isHoveringFolder,
+                        action: selectFolder
+                    )
+                    .onHover { isHoveringFolder = $0 }
+
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.secondary.opacity(0.5))
+
+                    // Image Slot
+                    SelectionCard(
+                        title: iconImage != nil ? "Image Loaded" : "Select Icon",
+                        subtitle: "Source",
+                        icon: "photo.fill",
+                        image: iconImage,
+                        isSelected: iconImage != nil,
+                        isHovering: isHoveringImage,
+                        action: selectImage
+                    )
+                    .onHover { isHoveringImage = $0 }
+                }
+                .padding(.horizontal, 30)
+
+                Spacer()
+
+                // Apply Button
+                VStack(spacing: 15) {
+                    Button(action: applyNewIcon) {
+                        Text("Apply Transformation")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(canApply ? Color.blue : Color.gray.opacity(0.3))
+                            .cornerRadius(12)
+                            .shadow(color: canApply ? Color.blue.opacity(0.3) : .clear, radius: 10, y: 5)
                     }
-                    .frame(height: 150)
-                    .background(Color.black.opacity(0.1))
-                    .cornerRadius(8)
+                    .buttonStyle(.plain)
+                    .disabled(!canApply)
+
+                    Text(statusMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
+                .padding(.horizontal, 40)
+                .padding(.bottom, 30)
             }
-            .padding(.horizontal)
-
-            Divider()
-
-            // 2. Icon Selection
-            VStack {
-                Button("Select Custom Icon Image") {
-                    selectImage()
-                }
-                
-                if let image = iconImage {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 64, height: 64)
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
-                }
-            }
-
-            // 3. Apply Action
-            Button(action: applyNewIcon) {
-                Text("Apply New Icon")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(folderURL == nil || iconImage == nil)
-            .padding()
-
-            Text(statusMessage)
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .padding(.bottom)
         }
-        .frame(width: 400, height: 550)
+        .frame(width: 500, height: 420)
     }
 
-    // MARK: - Logic Functions
+    var canApply: Bool {
+        folderURL != nil && iconImage != nil
+    }
+
+    // MARK: - Logic
 
     func selectFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
-
         if panel.runModal() == .OK {
             self.folderURL = panel.url
-            updateFolderPreview()
-            statusMessage = "Folder selected. Now pick an image."
-        }
-    }
-
-    func updateFolderPreview() {
-        guard let url = folderURL else { return }
-        do {
-            let items = try FileManager.default.contentsOfDirectory(atPath: url.path)
-            self.folderContents = items.filter { !$0.hasPrefix(".") } // Hide hidden files
-        } catch {
-            statusMessage = "Error reading folder contents."
+            statusMessage = "Target folder set."
         }
     }
 
     func selectImage() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image, .png, .jpeg]
-        panel.allowsMultipleSelection = false
-
         if panel.runModal() == .OK, let url = panel.url {
-            if let img = NSImage(contentsOf: url) {
-                self.iconImage = img
-                statusMessage = "Image loaded. Ready to apply!"
-            }
+            self.iconImage = NSImage(contentsOf: url)
+            statusMessage = "Icon image loaded."
         }
     }
 
     func applyNewIcon() {
         guard let folder = folderURL, let icon = iconImage else { return }
-        
-        // This is the core macOS API that changes the icon
         let success = NSWorkspace.shared.setIcon(icon, forFile: folder.path, options: [])
         
-        if success {
-            statusMessage = "Success! Icon changed for \(folder.lastPathComponent)."
-        } else {
-            statusMessage = "Failed to set icon. Check permissions."
+        withAnimation {
+            statusMessage = success ? "Success! Icon updated." : "Permission denied."
         }
+        
+        if success {
+            // Optional: Haptic/Sound feedback
+            NSSound(named: "Glass")?.play()
+        }
+    }
+}
+
+// MARK: - Subviews
+
+struct SelectionCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let image: NSImage?
+    let isSelected: Bool
+    let isHovering: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.white.opacity(isHovering ? 0.15 : 0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(isSelected ? Color.blue.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
+
+                    if let image = image {
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 80, height: 80)
+                            .cornerRadius(12)
+                            .transition(.scale.combined(with: .opacity))
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 40))
+                            .foregroundColor(isSelected ? .blue : .secondary)
+                    }
+                }
+                .frame(width: 140, height: 140)
+
+                VStack(spacing: 4) {
+                    Text(subtitle.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(title)
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
+        .animation(.spring(), value: isSelected)
+    }
+}
+
+// Helper for Background Blur
+struct VisualEffectView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    let blendingMode: NSVisualEffectView.BlendingMode
+    
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = blendingMode
     }
 }

@@ -10,24 +10,30 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            // macOS Native Background Blur
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            // Background: Native Blur + Subtle Warm Glow
+            VisualEffectView(material: .underWindowBackground, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+            
+            // This creates that "Full Width" colorful look from your screenshot
+            RadialGradient(colors: [Color.orange.opacity(0.2), Color.clear], center: .center, startRadius: 0, endRadius: 400)
                 .ignoresSafeArea()
 
-            VStack(spacing: 30) {
+            VStack(spacing: 0) {
                 // Header
                 VStack(spacing: 8) {
                     Text("Iconic")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .tracking(-1)
                     Text("Professional folder customization")
-                        .font(.subheadline)
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.secondary)
                 }
-                .padding(.top, 30)
+                .padding(.top, 40)
+
+                Spacer()
 
                 // Selection Area
-                HStack(spacing: 20) {
-                    // Folder Slot
+                HStack(spacing: 40) {
                     SelectionCard(
                         title: folderURL?.lastPathComponent ?? "Select Folder",
                         subtitle: "Target",
@@ -40,10 +46,9 @@ struct ContentView: View {
                     .onHover { isHoveringFolder = $0 }
 
                     Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.secondary.opacity(0.5))
+                        .font(.system(size: 28))
+                        .foregroundColor(.secondary.opacity(0.3))
 
-                    // Image Slot
                     SelectionCard(
                         title: iconImage != nil ? "Image Loaded" : "Select Icon",
                         subtitle: "Source",
@@ -55,42 +60,37 @@ struct ContentView: View {
                     )
                     .onHover { isHoveringImage = $0 }
                 }
-                .padding(.horizontal, 30)
 
                 Spacer()
 
-                // Apply Button
-                VStack(spacing: 15) {
+                // Action Area
+                VStack(spacing: 20) {
                     Button(action: applyNewIcon) {
                         Text("Apply Transformation")
-                            .font(.headline)
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(canApply ? Color.blue : Color.gray.opacity(0.3))
-                            .cornerRadius(12)
-                            .shadow(color: canApply ? Color.blue.opacity(0.3) : .clear, radius: 10, y: 5)
+                            .frame(width: 320, height: 48)
+                            .background(canApply ? Color.blue : Color.white.opacity(0.1))
+                            .cornerRadius(14)
+                            .shadow(color: canApply ? Color.blue.opacity(0.4) : .clear, radius: 15, y: 5)
                     }
                     .buttonStyle(.plain)
                     .disabled(!canApply)
 
                     Text(statusMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(statusMessage.contains("Success") ? .orange : .secondary)
+                        .transition(.opacity)
                 }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 30)
+                .padding(.bottom, 50)
             }
         }
-        .frame(width: 500, height: 420)
+        .frame(minWidth: 600, minHeight: 450)
     }
 
     var canApply: Bool {
         folderURL != nil && iconImage != nil
     }
-
-    // MARK: - Logic
 
     func selectFolder() {
         let panel = NSOpenPanel()
@@ -116,19 +116,21 @@ struct ContentView: View {
         guard let folder = folderURL, let icon = iconImage else { return }
         let success = NSWorkspace.shared.setIcon(icon, forFile: folder.path, options: [])
         
-        withAnimation {
-            statusMessage = success ? "Success! Icon updated." : "Permission denied."
-        }
-        
         if success {
-            // Optional: Haptic/Sound feedback
+            withAnimation(.spring()) {
+                statusMessage = "Success! Icon updated."
+                // Resetting both selections
+                self.folderURL = nil
+                self.iconImage = nil
+            }
             NSSound(named: "Glass")?.play()
+        } else {
+            statusMessage = "Failed to apply icon."
         }
     }
 }
 
-// MARK: - Subviews
-
+// Support Views
 struct SelectionCard: View {
     let title: String
     let subtitle: String
@@ -140,53 +142,49 @@ struct SelectionCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
+            VStack(spacing: 15) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(isHovering ? 0.15 : 0.08))
+                    RoundedRectangle(cornerRadius: 28)
+                        .fill(Color.white.opacity(isHovering ? 0.1 : 0.05))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(isSelected ? Color.blue.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 28)
+                                .stroke(isSelected ? Color.blue.opacity(0.6) : Color.white.opacity(0.1), lineWidth: 1.5)
                         )
-                        .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
 
                     if let image = image {
                         Image(nsImage: image)
                             .resizable()
-                            .scaledToFit()
-                            .frame(width: 80, height: 80)
+                            .scaledToFill() // Better for filling the card width
+                            .frame(width: 110, height: 110)
                             .cornerRadius(12)
-                            .transition(.scale.combined(with: .opacity))
+                            .clipped()
                     } else {
                         Image(systemName: icon)
-                            .font(.system(size: 40))
-                            .foregroundColor(isSelected ? .blue : .secondary)
+                            .font(.system(size: 50))
+                            .foregroundColor(isSelected ? .blue : .secondary.opacity(0.7))
                     }
                 }
-                .frame(width: 140, height: 140)
+                .frame(width: 180, height: 180)
 
                 VStack(spacing: 4) {
                     Text(subtitle.uppercased())
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 10, weight: .black))
                         .foregroundColor(.secondary)
+                        .kerning(1)
                     Text(title)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .bold))
                         .lineLimit(1)
-                        .truncationMode(.middle)
+                        .frame(width: 160)
                 }
             }
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
-        .animation(.spring(), value: isSelected)
     }
 }
 
-// Helper for Background Blur
 struct VisualEffectView: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let blendingMode: NSVisualEffectView.BlendingMode
-    
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = material
@@ -194,9 +192,5 @@ struct VisualEffectView: NSViewRepresentable {
         view.state = .active
         return view
     }
-    
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-        nsView.blendingMode = blendingMode
-    }
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
